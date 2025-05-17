@@ -8,6 +8,8 @@ import numpy
 from worldengine.generation import Step, add_noise_to_elevation, center_land, generate_world, \
     get_verbose, initialize_ocean_and_thresholds, place_oceans_at_map_borders
 from worldengine.model.world import World, Size, GenerationParameters
+from worldengine.common import print_verbose
+from tqdm import tqdm
 
 
 def generate_plates_simulation(seed, width, height, sea_level=0.65,
@@ -18,20 +20,28 @@ def generate_plates_simulation(seed, width, height, sea_level=0.65,
 
     if verbose:
         start_time = time.time()
+        print_verbose("...starting plate simulation")
+
     p = platec.create(seed, width, height, sea_level, erosion_period,
                       folding_ratio, aggr_overlap_abs, aggr_overlap_rel,
                       cycle_count, num_plates)
-    # Note: To rescale the worlds heightmap to roughly Earths scale, multiply by 2000.
 
+    progress_bar = tqdm(desc="Plate Simulation Steps", unit="step", disable=not verbose)
+    platec_steps = 0
     while platec.is_finished(p) == 0:
-        # TODO: add a if verbose: message here?
         platec.step(p)
+        platec_steps += 1
+        if verbose:
+            progress_bar.update(1)
+    if verbose:
+        progress_bar.close()
+        print_verbose("...plate simulation finished after %d steps" % platec_steps)
+
     hm = platec.get_heightmap(p)
     pm = platec.get_platesmap(p)
     if verbose:
         elapsed_time = time.time() - start_time
-        print("...plates.generate_plates_simulation() complete. " +
-              "Elapsed time " + str(elapsed_time) + " seconds.")
+        print_verbose("...plates.generate_plates_simulation() complete. Elapsed time %s seconds." % elapsed_time)
     return hm, pm
 
 

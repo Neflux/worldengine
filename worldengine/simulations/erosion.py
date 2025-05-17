@@ -1,6 +1,8 @@
 import math
 import numpy
 import worldengine.astar
+from tqdm import tqdm
+from worldengine.common import get_verbose, print_verbose
 
 # Direction
 NORTH = [0, -1]
@@ -33,6 +35,10 @@ class ErosionSimulation(object):
         self.wrap = True
 
     def execute(self, world, seed):
+        verbose = get_verbose()
+        if verbose:
+            print_verbose("Starting erosion simulation...")
+
         water_flow = numpy.zeros((world.height, world.width))
         water_path = numpy.zeros((world.height, world.width), dtype=int)
         river_list = []
@@ -41,13 +47,20 @@ class ErosionSimulation(object):
         lake_map = numpy.zeros((world.height, world.width))
 
         # step one: water flow per cell based on rainfall
+        if verbose:
+            print_verbose("...calculating water flow paths")
         self.find_water_flow(world, water_path)
 
         # step two: find river sources (seeds)
+        if verbose:
+            print_verbose("...finding river sources")
         river_sources = self.river_sources(world, water_flow, water_path)
 
         # step three: for each source, find a path to sea
-        for source in river_sources:
+        if verbose:
+            print_verbose("...simulating river flows")
+        river_source_iterable = tqdm(river_sources, desc="River Flow", unit="source", disable=not verbose) if verbose else river_sources
+        for source in river_source_iterable:
             river = self.river_flow(source, world, river_list, lake_list)
             if river:
                 river_list.append(river)
@@ -57,26 +70,38 @@ class ErosionSimulation(object):
                     lake_list.append(river[-1])  # river flowed into a lake
 
         # step four: simulate erosion and updating river map
-        for river in river_list:
+        if verbose:
+            print_verbose("...simulating river erosion and updating river map")
+        river_list_iterable_erosion = tqdm(river_list, desc="River Erosion", unit="river", disable=not verbose) if verbose else river_list
+        for river in river_list_iterable_erosion:
             self.river_erosion(river, world)
             self.rivermap_update(river, water_flow, river_map, world.layers['precipitation'].data)
 
         # step five: rivers with no paths to sea form lakes
         for lake in lake_list:
-            # print "Found lake at:",lake
             lx, ly = lake
             lake_map[ly, lx] = 0.1  # TODO: make this based on rainfall/flow
 
         world.rivermap = river_map
         world.lakemap = lake_map
+        if verbose:
+            print_verbose("Erosion simulation completed.")
 
     def find_water_flow(self, world, water_path):
-        """Find the flow direction for each cell in heightmap"""
-
+        verbose = get_verbose()
         # iterate through each cell
-        for x in range(world.width - 1):
-            for y in range(world.height - 1):
-                # search around cell for a direction
+        # Use nested tqdm if verbose for both width and height
+        x_range = range(world.width - 1)
+        if verbose:
+            x_range = tqdm(x_range, desc="Water Flow (x)", unit="col", leave=False)
+
+        for x in x_range:
+            y_range = range(world.height - 1)
+            # Inner loop tqdm can be too noisy if not handled well with outer.
+            # For simplicity, only outer loop tqdm or a single combined tqdm.
+            # Let's do a combined one for total cells.
+            # Re-thinking: a single tqdm for the outer loop is fine. Inner loop is fast per x.
+            for y in y_range:
                 path = self.find_quick_path([x, y], world)
                 if path:
                     tx, ty = path
@@ -86,6 +111,8 @@ class ErosionSimulation(object):
                         if direction == flow_dir:
                             water_path[y, x] = key
                         key += 1
+        if verbose and isinstance(x_range, tqdm): # Close if it was a tqdm instance
+             x_range.close()
 
     def find_quick_path(self, river, world):
         # Water flows based on cost, seeking the highest elevation difference
@@ -121,7 +148,7 @@ class ErosionSimulation(object):
 
     @staticmethod
     def river_sources(world, water_flow, water_path):
-        """Find places on map where sources of river can be found"""
+        verbose = get_verbose()
         river_source_list = []
 
         # Using the wind and rainfall data, create river 'seeds' by
@@ -135,7 +162,11 @@ class ErosionSimulation(object):
         #     we mark them as rivers. While looking, the cells with no
         #     out-going flow, above water flow threshold and are still
         #     above sea level are marked as 'sources'.
-        for y in range(0, world.height - 1):
+        y_range = range(0, world.height - 1)
+        if verbose:
+            y_range = tqdm(y_range, desc="River Sources (y)", unit="row", leave=False)
+
+        for y in y_range:
             for x in range(0, world.width - 1):
                 rain_fall = world.layers['precipitation'].data[y, x]
                 water_flow[y, x] = rain_fall
@@ -170,6 +201,8 @@ class ErosionSimulation(object):
                     nx, ny = cx + dx, cy + dy  # calculate next cell
                     water_flow[ny, nx] += rain_fall
                     cx, cy = nx, ny  # set current cell to next cell
+        if verbose and isinstance(y_range, tqdm):
+            y_range.close()
         return river_source_list
 
     def river_flow(self, source, world, river_list, lake_list):

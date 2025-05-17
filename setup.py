@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 # from pip.req import parse_requirements
 # import pip.download
 
@@ -20,13 +20,12 @@ config = {
     'url': 'http://github.com/Mindwerks/worldengine',
     'download_url': 'https://github.com/Mindwerks/worldengine/releases',
     'version': __version__,
-    'packages': ['worldengine', 'worldengine.cli', 'worldengine.simulations',
-                 'worldengine.protobuf', 'worldengine.imex'],
+    'packages': find_packages(),
     'entry_points': {
         'console_scripts': ['worldengine=worldengine.cli.main:main'],
     },
-    'install_requires': ['PyPlatec==1.4.0', 'pypng>=0.0.18', 'numpy>=1.22.2',
-                         'argparse==1.2.1', 'noise==1.2.2', 'protobuf==3.0.0a3'],
+    'install_requires': ['PyPlatec==1.4.0', 'pypng>=0.0.20', 'numpy>=1.22.2',
+                         'argparse==1.2.1', 'noise==1.2.2', 'protobuf==3.20.3', 'tqdm'],
     'license': 'MIT License'
 }
 

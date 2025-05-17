@@ -330,7 +330,7 @@ def draw_simple_elevation(world, sea_level, target):
         on disk or a canvas part of a GUI)
     """
     e = world.layers['elevation'].data
-    c = numpy.empty(e.shape, dtype=numpy.float)
+    c = numpy.empty(e.shape, dtype=float)
 
     has_ocean = not (sea_level is None or world.layers['ocean'].data is None or not world.layers['ocean'].data.any())  # or 'not any ocean'
     mask_land = numpy.ma.array(e, mask=world.layers['ocean'].data if has_ocean else False)  # only land
